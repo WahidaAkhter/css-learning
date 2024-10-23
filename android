@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+
+package="com.myapp.craftsman">
+
+
+<uses-permission
+android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.INTERNET" /><uses-permission android:name="android.permission.CALL_PHONE" />
+
+<uses-feature
+android:glEsVersion="0x00020000"
+android:required="true" />
+
+<application
+android:allowBackup="true"
+android:icon="@mipmap/ic_launcher"
+android:label="@string/app_name"
+android:roundIcon="@mipmap/ic_launcher_round"
+android:supportsRtl="true"
+android:theme="@style/AppTheme">
+
+<meta-data
+android:name="com.google.android.gms.version"
+android:value="@integer/google_play_services_version" />
+
+<meta-data
+android:name="com.google.android.geo.API_KEY"
+
+android:value="AIzaSyD2dhuEo55Ex8kHzoHZ0VxmiM0yF2I0Trg" />
+
+<activity android:name="com.myapp.craftsman.activity.MainActivity">
+
+<intent-filter>
+
+<action android:name="android.intent.action.MAIN" />
+<category android:name="android.intent.category.LAUNCHER" />
+
+</intent-filter>
+</activity>
+
+<meta-data
+android:name="preloaded_fonts"
+android:resource="@array/preloaded_fonts" />
+
+<activity android:name="com.myapp.craftsman.activity.RegisterActivity" /><activity android:name="com.myapp.craftsman.activity.WorkerHomeActivity" /><activity android:name="com.myapp.craftsman.activity.UserHomeActivity" />
+
+</application>
+
+</manifest>
+
+
+
+
+
+MainActivity.class:
+
+importandroid.app.ProgressDialog;
+
+importandroid.content.DialogInterface;
+
+importandroid.content.Intent;
+
+importandroid.os.Bundle;
+
+importandroid.support.annotation.NonNull;
+
+import android.support.v7.app.AlertDialog;
+
+import android.support.v7.app.AppCompatActivity;
+
+importandroid.view.LayoutInflater;
+
+importandroid.view.View;
+
+importandroid.widget.Button;
+
+importandroid.widget.EditText;
+
+importandroid.widget.Toast;
+
+
+importcom.google.android.gms.tasks.OnCompleteListener; import com.google.android.gms.tasks.OnFailureListener; import com.google.android.gms.tasks.Task;
+
+importcom.google.firebase.auth.AuthResult; import com.google.firebase.auth.FirebaseAuth; import com.google.firebase.auth.FirebaseUser; import com.google.firebase.database.DataSnapshot; import com.google.firebase.database.DatabaseError; import com.google.firebase.database.DatabaseReference; import com.google.firebase.database.FirebaseDatabase;
+ 
+importcom.google.firebase.database.ValueEventListener; import com.myapp.craftsman.R;
+
+importcom.myapp.craftsman.utility.SharedPreferenceManager;
+
+
+
+public class
+
+MainActivity extends AppCompatActivity {
+
+private Button hireButton;
+
+private Button workButton;
+
+privateFirebaseAuthmAuth;
+
+private String usertype;
+
+privateProgressDialogmProgressDialog;
+
+privateDatabaseReferencedataRef;
+
+privateFirebaseDatabase database;
+
+
+
+@Override
+
+protected void onCreate(Bundle savedInstanceState) { super.onCreate(savedInstanceState);
+
+//check if user id signed in !
+
+if (SharedPreferenceManager.getInstance(this).isLoggedIn()) { if
+
+(SharedPreferenceManager.getInstance(this).getUserType().equalsIgnoreCase("worker")) {
+
+startActivity(new Intent(this, WorkerHomeActivity.class)); } else if
+
+(SharedPreferenceManager.getInstance(this).getUserType().equalsIgnoreCase("user")) { startActivity(new Intent(this, UserHomeActivity.class));
+
+}
+
+} else {
+
+setContentView(R.layout.activity_main);
+
+database = FirebaseDatabase.getInstance();
+
+initializeViews();
+
+}
+
+}
+
+private void initializeViews() {
+hireButton = findViewById(R.id.btn_hire); workButton = findViewById(R.id.btn_work); mAuth = FirebaseAuth.getInstance(); mProgressDialog = new ProgressDialog(this); hireButton.setOnClickListener(new View.OnClickListener() {
+
+@Override
+
+public void onClick(View v) {
+
+usertype = "user";
+
+dataRef = database.getReference().child(usertype).child("information"); showUserLoginDialog("user");
+}
+
+});
+
+workButton.setOnClickListener(new View.OnClickListener() { @Override
+
+public void onClick(View v) {
+
+usertype = "worker";
+
+dataRef = database.getReference().child(usertype).child("information"); showUserLoginDialog("worker");
+}
+
+});
+
+}
+
+private void showUserLoginDialog(final String user) { AlertDialog.Builder builder;
+
+builder = new AlertDialog.Builder(this);
+
+builder.setTitle("Login");
+
+View viewInflated = LayoutInflater.from(this).inflate(R.layout.login_layout, null, false);
+
+finalEditTextemailInput = (EditText) viewInflated.findViewById(R.id.login_email); final EditTextpasswordInput = (EditText)
+viewInflated.findViewById(R.id.login_password);
+
+Button registerButton = viewInflated.findViewById(R.id.btn_register); builder.setView(viewInflated);
+
+builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener()
+
+{
+
+@Override
+
+public void onClick(DialogInterface dialog, int which) {
+String email = emailInput.getText().toString();
+
+String password = passwordInput.getText().toString();
+
+if (email.matches("") || password.matches("")) { Toast.makeText(MainActivity.this, "No Fields Can Be empty",
+
+Toast.LENGTH_SHORT).show();
+
+} else {
+
+//LOGIN USER
+
+mProgressDialog.setMessage("Logging In...");
+
+mProgressDialog.show();
+
+mAuth.signInWithEmailAndPassword(email, password)
+
+.addOnCompleteListener(MainActivity.this, new OnCompleteListener<AuthResult>() {
+
+@Override
+
+public void onComplete(@NonNull Task<AuthResult> task) {
+
+mProgressDialog.dismiss();
+
+if (task.isSuccessful()) {
+
+finalFirebaseUser user = mAuth.getCurrentUser(); dataRef.addListenerForSingleValueEvent(new ValueEventListener() {
+@Override
+
+public void onDataChange(DataSnapshotdataSnapshot) {
+
+if (dataSnapshot.hasChild(user.getUid())) {
+
+checkVerification(user);
+
+} else {
+
+Toast.makeText(MainActivity.this, "Not Registered as " + usertype.toUpperCase(),
+
+Toast.LENGTH_SHORT).show();
+
+mAuth.signOut();
+
+}
+
+}
+
+@Override
+
+public void onCancelled(DatabaseErrordatabaseError) {
+
+}
+
+});
+
+} else {
+
+Toast.makeText(MainActivity.this, task.getException().getLocalizedMessage(),
+
+Toast.LENGTH_SHORT).show();
+
+}
+
+}
+ 
+
+})
+
+.addOnFailureListener(new OnFailureListener() { @Override
+
+public void onFailure(@NonNull Exception e) {
+
+mProgressDialog.dismiss();
+
+Toast.makeText(MainActivity.this, e.getLocalizedMessage(),
+
+Toast.LENGTH_SHORT).show();
+
+}
+
+});
+
+}
+
+}
+
+});
+
+builder.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
+
+@Override
+
+public void onClick(DialogInterface dialog, int which) { dialog.cancel();
+
+}
+
+});
+
+registerButton.setOnClickListener(new View.OnClickListener() { @Override
+
+public void onClick(View v) {
+
+showUserRegister(user);
+
+}
+
+});
+
+builder.show();
+
+}
+
+private void checkVerification(FirebaseUser user) { //verification turned off for testing purpose
+
+//	if (user.isEmailVerified()) { Toast.makeText(MainActivity.this, "Successfully Signed in.",
+
+Toast.LENGTH_SHORT).show(); showHome(user.getUid());
+
+//	} else {
+
+//	Toast.makeText(MainActivity.this, "Please Verify Your Email",
+//	Toast.LENGTH_SHORT).show();
+
+//	user.sendEmailVerification();
+
+//	mAuth.signOut();
+
+//	}
+
+private void showHome(String uid) {
+
+SharedPreferenceManager.getInstance(this).setUserId(uid); if (usertype.equals("worker")) {
+
+SharedPreferenceManager.getInstance(this).setUserType("worker"); startActivity(new Intent(MainActivity.this, WorkerHomeActivity.class));
+
+} else {
+
+SharedPreferenceManager.getInstance(this).setUserType("user");
+
+startActivity(new Intent(MainActivity.this, UserHomeActivity.class));
+
+}
+
+}
+
+
+private void showUserRegister(String user) {
+
+Intent intent = new Intent(getBaseContext(), RegisterActivity.class); intent.putExtra("USER_TYPE", user); startActivity(intent);
+
+}
+
+}
+ 
+
